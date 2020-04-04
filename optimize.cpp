@@ -143,7 +143,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 					meshopt_vertex.pz = vertex.z;
 					meshopt_vertices.write[k] = meshopt_vertex;
 				}
-				
+
 				// simplifying from the base level sometimes produces better results
 
 				const int32_t current_lod = lods.size() - 1;
@@ -200,6 +200,13 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				mi->set_owner(meshes[i].original_node->get_owner());
 			}
 		}
+		Spatial *spatial = memnew(Spatial);
+		Spatial *mesh_instance = Object::cast_to<Spatial>(meshes[i].original_node);
+		if (mesh_instance) {
+			spatial->set_transform(mesh_instance->get_transform());
+		}
+		spatial->set_name(meshes[i].original_node->get_name());
+		meshes[i].original_node->replace_by(spatial);
 	}
 }
 
