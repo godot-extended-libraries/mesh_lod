@@ -28,5 +28,5 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-void register_mesh_optimize_types();
-void unregister_mesh_optimize_types();
+void register_mesh_lod_types();
+void unregister_mesh_lod_types();

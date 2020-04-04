@@ -34,12 +34,12 @@
 #include "optimize.h"
 #endif
 
-void register_mesh_optimize_types() {
+void register_mesh_lod_types() {
 #ifdef TOOLS_ENABLED
 	ClassDB::register_class<MeshOptimize>();
 	EditorPlugins::add_by_type<MeshOptimizePlugin>();
 #endif
 }
 
-void unregister_mesh_optimize_types() {
+void unregister_mesh_lod_types() {
 }

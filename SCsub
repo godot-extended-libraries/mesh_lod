@@ -11,7 +11,7 @@ if (not env.msvc):
     
 env_thirdparty = env_scene_optimize.Clone()
 env_thirdparty.disable_warnings()
-env_thirdparty.add_source_files(env.modules_sources, Glob('#thirdparty/meshoptimizer/src/*.cpp'))
+env_thirdparty.add_source_files(env.modules_sources, Glob('thirdparty/meshoptimizer/src/*.cpp'))
 
 # Godot's own source files
 env_scene_optimize.add_source_files(env.modules_sources, "*.cpp")
