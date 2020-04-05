@@ -163,6 +163,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 
 				meshopt_optimizeVertexCache(&lod.write[0], &lod.write[0], lod.size(), meshopt_vertices.size());
 				meshopt_optimizeOverdraw(&lod.write[0], &lod[0], lod.size(), &meshopt_vertices[0].px, meshopt_vertices.size(), sizeof(Vertex), 1.0f);
+				meshopt_optimizeVertexFetch(&meshopt_vertices.write[0].px, &lod.write[0], lod.size(), &meshopt_vertices[0].px, meshopt_vertices.size(), sizeof(Vertex));
 
 				Array blend_shape_array = VisualServer::get_singleton()->mesh_surface_get_blend_shape_arrays(mesh->get_rid(), j);
 				for (size_t blend_i = 0; blend_i < blend_shape_array.size(); blend_i++) {
