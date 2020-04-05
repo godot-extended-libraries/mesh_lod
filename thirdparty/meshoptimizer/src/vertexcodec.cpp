@@ -73,14 +73,13 @@
 #endif
 
 #ifdef SIMD_WASM
-#define wasmx_swizzle_v32x4(v, i, j, k, l) wasm_v8x16_shuffle(v, v, 4 * i, 4 * i + 1, 4 * i + 2, 4 * i + 3, 4 * j, 4 * j + 1, 4 * j + 2, 4 * j + 3, 4 * k, 4 * k + 1, 4 * k + 2, 4 * k + 3, 4 * l, 4 * l + 1, 4 * l + 2, 4 * l + 3)
-#define wasmx_splat_v32x4(v, i) wasm_v8x16_shuffle(v, v, 4 * i, 4 * i + 1, 4 * i + 2, 4 * i + 3, 4 * i, 4 * i + 1, 4 * i + 2, 4 * i + 3, 4 * i, 4 * i + 1, 4 * i + 2, 4 * i + 3, 4 * i, 4 * i + 1, 4 * i + 2, 4 * i + 3)
+#define wasmx_splat_v32x4(v, i) wasm_v32x4_shuffle(v, v, i, i, i, i)
 #define wasmx_unpacklo_v8x16(a, b) wasm_v8x16_shuffle(a, b, 0, 16, 1, 17, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23)
 #define wasmx_unpackhi_v8x16(a, b) wasm_v8x16_shuffle(a, b, 8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31)
-#define wasmx_unpacklo_v16x8(a, b) wasm_v8x16_shuffle(a, b, 0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23)
-#define wasmx_unpackhi_v16x8(a, b) wasm_v8x16_shuffle(a, b, 8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31)
-#define wasmx_unpacklo_v64x2(a, b) wasm_v8x16_shuffle(a, b, 0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23)
-#define wasmx_unpackhi_v64x2(a, b) wasm_v8x16_shuffle(a, b, 8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30, 31)
+#define wasmx_unpacklo_v16x8(a, b) wasm_v16x8_shuffle(a, b, 0, 8, 1, 9, 2, 10, 3, 11)
+#define wasmx_unpackhi_v16x8(a, b) wasm_v16x8_shuffle(a, b, 4, 12, 5, 13, 6, 14, 7, 15)
+#define wasmx_unpacklo_v64x2(a, b) wasm_v64x2_shuffle(a, b, 0, 2)
+#define wasmx_unpackhi_v64x2(a, b) wasm_v64x2_shuffle(a, b, 1, 3)
 #endif
 
 #if defined(SIMD_WASM)
@@ -97,9 +96,12 @@ namespace meshopt
 
 const unsigned char kVertexHeader = 0xa0;
 
+static int gEncodeVertexVersion = 0;
+
 const size_t kVertexBlockSizeBytes = 8192;
 const size_t kVertexBlockMaxSize = 256;
 const size_t kByteGroupSize = 16;
+const size_t kByteGroupDecodeLimit = 24;
 const size_t kTailMaxSize = 32;
 
 static size_t getVertexBlockSize(size_t vertex_size)
@@ -230,7 +232,7 @@ static unsigned char* encodeBytes(unsigned char* data, unsigned char* data_end, 
 
 	for (size_t i = 0; i < buffer_size; i += kByteGroupSize)
 	{
-		if (size_t(data_end - data) < kTailMaxSize)
+		if (size_t(data_end - data) < kByteGroupDecodeLimit)
 			return 0;
 
 		int best_bits = 8;
@@ -383,7 +385,7 @@ static const unsigned char* decodeBytes(const unsigned char* data, const unsigne
 
 	for (size_t i = 0; i < buffer_size; i += kByteGroupSize)
 	{
-		if (size_t(data_end - data) < kTailMaxSize)
+		if (size_t(data_end - data) < kByteGroupDecodeLimit)
 			return 0;
 
 		size_t header_offset = i / kByteGroupSize;
@@ -743,7 +745,7 @@ static v128_t decodeShuffleMask(unsigned char mask0, unsigned char mask1)
 SIMD_TARGET
 static void wasmMoveMask(v128_t mask, unsigned char& mask0, unsigned char& mask1)
 {
-	v128_t mask_0 = wasmx_swizzle_v32x4(mask, 0, 2, 1, 3);
+	v128_t mask_0 = wasm_v32x4_shuffle(mask, mask, 0, 2, 1, 3);
 
 	// TODO: when Chrome supports v128.const we can try doing vectorized and?
 	uint64_t mask_1a = wasm_i64x2_extract_lane(mask_0, 0) & 0x0804020108040201ull;
@@ -907,7 +909,8 @@ SIMD_TARGET
 static v128_t unzigzag8(v128_t v)
 {
 	v128_t xl = wasm_i8x16_neg(wasm_v128_and(v, wasm_i8x16_splat(1)));
-	v128_t xr = wasm_u8x16_shr(v, 1);
+	// TODO: use wasm_u8x16_shr when v8 fixes codegen for constant shifts
+	v128_t xr = wasm_v128_and(wasm_u16x8_shr(v, 1), wasm_i8x16_splat(127));
 
 	return wasm_v128_xor(xl, xr);
 }
@@ -932,8 +935,8 @@ static const unsigned char* decodeBytesSimd(const unsigned char* data, const uns
 
 	size_t i = 0;
 
-	// fast-path: process 4 groups at a time, do a shared bounds check - each group reads <=32b
-	for (; i + kByteGroupSize * 4 <= buffer_size && size_t(data_end - data) >= kTailMaxSize * 4; i += kByteGroupSize * 4)
+	// fast-path: process 4 groups at a time, do a shared bounds check - each group reads <=24b
+	for (; i + kByteGroupSize * 4 <= buffer_size && size_t(data_end - data) >= kByteGroupDecodeLimit * 4; i += kByteGroupSize * 4)
 	{
 		size_t header_offset = i / kByteGroupSize;
 		unsigned char header_byte = header[header_offset / 4];
@@ -947,7 +950,7 @@ static const unsigned char* decodeBytesSimd(const unsigned char* data, const uns
 	// slow-path: process remaining groups
 	for (; i < buffer_size; i += kByteGroupSize)
 	{
-		if (size_t(data_end - data) < kTailMaxSize)
+		if (size_t(data_end - data) < kByteGroupDecodeLimit)
 			return 0;
 
 		size_t header_offset = i / kByteGroupSize;
@@ -1095,7 +1098,9 @@ size_t meshopt_encodeVertexBuffer(unsigned char* buffer, size_t buffer_size, con
 	if (size_t(data_end - data) < 1 + vertex_size)
 		return 0;
 
-	*data++ = kVertexHeader;
+	int version = gEncodeVertexVersion;
+
+	*data++ = (unsigned char)(kVertexHeader | version);
 
 	unsigned char first_vertex[256] = {};
 	if (vertex_count > 0)
@@ -1180,6 +1185,13 @@ size_t meshopt_encodeVertexBufferBound(size_t vertex_count, size_t vertex_size)
 	return 1 + vertex_block_count * vertex_size * (vertex_block_header_size + vertex_block_data_size) + tail_size;
 }
 
+void meshopt_encodeVertexVersion(int version)
+{
+	assert(unsigned(version) <= 0);
+
+	meshopt::gEncodeVertexVersion = version;
+}
+
 int meshopt_decodeVertexBuffer(void* destination, size_t vertex_count, size_t vertex_size, const unsigned char* buffer, size_t buffer_size)
 {
 	using namespace meshopt;
@@ -1210,7 +1222,13 @@ int meshopt_decodeVertexBuffer(void* destination, size_t vertex_count, size_t ve
 	if (size_t(data_end - data) < 1 + vertex_size)
 		return -2;
 
-	if (*data++ != kVertexHeader)
+	unsigned char data_header = *data++;
+
+	if ((data_header & 0xf0) != kVertexHeader)
+		return -1;
+
+	int version = data_header & 0x0f;
+	if (version > 0)
 		return -1;
 
 	unsigned char last_vertex[256];

@@ -12,10 +12,10 @@
 #endif
 
 #ifdef SIMD_WASM
-#define wasmx_unpacklo_v16x8(a, b) wasm_v8x16_shuffle(a, b, 0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23)
-#define wasmx_unpackhi_v16x8(a, b) wasm_v8x16_shuffle(a, b, 8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31)
-#define wasmx_unziplo_v32x4(a, b) wasm_v8x16_shuffle(a, b, 0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 19, 24, 25, 26, 27)
-#define wasmx_unziphi_v32x4(a, b) wasm_v8x16_shuffle(a, b, 4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31)
+#define wasmx_unpacklo_v16x8(a, b) wasm_v16x8_shuffle(a, b, 0, 8, 1, 9, 2, 10, 3, 11)
+#define wasmx_unpackhi_v16x8(a, b) wasm_v16x8_shuffle(a, b, 4, 12, 5, 13, 6, 14, 7, 15)
+#define wasmx_unziplo_v32x4(a, b) wasm_v32x4_shuffle(a, b, 0, 2, 4, 6)
+#define wasmx_unziphi_v32x4(a, b) wasm_v32x4_shuffle(a, b, 1, 3, 5, 7)
 #endif
 
 namespace meshopt
@@ -57,7 +57,7 @@ static void decodeFilterOct(T* data, size_t count)
 
 static void decodeFilterQuat(short* data, size_t count)
 {
-	const float scale = 1.f / (2047.f * sqrtf(2.f));
+	const float scale = 1.f / sqrtf(2.f);
 
 	static const int order[4][4] = {
 	    {1, 2, 3, 0},
@@ -68,10 +68,14 @@ static void decodeFilterQuat(short* data, size_t count)
 
 	for (size_t i = 0; i < count; ++i)
 	{
+		// recover scale from the high byte of the component
+		int sf = data[i * 4 + 3] | 3;
+		float ss = scale / float(sf);
+
 		// convert x/y/z to [-1..1] (scaled...)
-		float x = float(data[i * 4 + 0]) * scale;
-		float y = float(data[i * 4 + 1]) * scale;
-		float z = float(data[i * 4 + 2]) * scale;
+		float x = float(data[i * 4 + 0]) * ss;
+		float y = float(data[i * 4 + 1]) * ss;
+		float z = float(data[i * 4 + 2]) * ss;
 
 		// reconstruct w as a square root; we clamp to 0.f to avoid NaN due to precision errors
 		float ww = 1.f - x * x - y * y - z * z;
@@ -90,6 +94,29 @@ static void decodeFilterQuat(short* data, size_t count)
 		data[i * 4 + order[qc][1]] = short(yf);
 		data[i * 4 + order[qc][2]] = short(zf);
 		data[i * 4 + order[qc][3]] = short(wf);
+	}
+}
+
+static void decodeFilterExp(unsigned int* data, size_t count)
+{
+	for (size_t i = 0; i < count; ++i)
+	{
+		unsigned int v = data[i];
+
+		// decode mantissa and exponent
+		int m = int(v << 8) >> 8;
+		int e = int(v) >> 24;
+
+		union {
+			float f;
+			unsigned int ui;
+		} u;
+
+		// optimized version of ldexp(float(m), e)
+		u.ui = unsigned(e + 127) << 23;
+		u.f = u.f * float(m);
+
+		data[i] = u.ui;
 	}
 }
 #endif
@@ -211,7 +238,7 @@ static void decodeFilterOctSimd(short* data, size_t count)
 
 static void decodeFilterQuatSimd(short* data, size_t count)
 {
-	const float scale = 1.f / (2047.f * sqrtf(2.f));
+	const float scale = 1.f / sqrtf(2.f);
 
 	for (size_t i = 0; i < count; i += 4)
 	{
@@ -226,11 +253,16 @@ static void decodeFilterQuatSimd(short* data, size_t count)
 		v128_t xf = wasm_i32x4_shr(wasm_i32x4_shl(q4_xy, 16), 16);
 		v128_t yf = wasm_i32x4_shr(q4_xy, 16);
 		v128_t zf = wasm_i32x4_shr(wasm_i32x4_shl(q4_zc, 16), 16);
+		v128_t cf = wasm_i32x4_shr(q4_zc, 16);
+
+		// get a floating-point scaler using zc with bottom 2 bits set to 1 (which represents 1.f)
+		v128_t sf = wasm_v128_or(cf, wasm_i32x4_splat(3));
+		v128_t ss = wasm_f32x4_div(wasm_f32x4_splat(scale), wasm_f32x4_convert_i32x4(sf));
 
 		// convert x/y/z to [-1..1] (scaled...)
-		v128_t x = wasm_f32x4_mul(wasm_f32x4_convert_i32x4(xf), wasm_f32x4_splat(scale));
-		v128_t y = wasm_f32x4_mul(wasm_f32x4_convert_i32x4(yf), wasm_f32x4_splat(scale));
-		v128_t z = wasm_f32x4_mul(wasm_f32x4_convert_i32x4(zf), wasm_f32x4_splat(scale));
+		v128_t x = wasm_f32x4_mul(wasm_f32x4_convert_i32x4(xf), ss);
+		v128_t y = wasm_f32x4_mul(wasm_f32x4_convert_i32x4(yf), ss);
+		v128_t z = wasm_f32x4_mul(wasm_f32x4_convert_i32x4(zf), ss);
 
 		// reconstruct w as a square root; we clamp to 0.f to avoid NaN due to precision errors
 		// note: i32x4_max_s with 0 is equivalent to f32x4_max
@@ -257,7 +289,7 @@ static void decodeFilterQuatSimd(short* data, size_t count)
 		v128_t res_1 = wasmx_unpackhi_v16x8(wyr, xzr);
 
 		// compute component index shifted left by 4 (and moved into i32x4 slot)
-		v128_t cm = wasm_i32x4_shl(wasm_i32x4_shr(q4_zc, 16), 4);
+		v128_t cm = wasm_i32x4_shl(cf, 4);
 
 		// rotate and store
 		uint64_t* out = (uint64_t*)&data[i * 4];
@@ -266,6 +298,26 @@ static void decodeFilterQuatSimd(short* data, size_t count)
 		out[1] = __builtin_rotateleft64(wasm_i64x2_extract_lane(res_0, 1), wasm_i32x4_extract_lane(cm, 1));
 		out[2] = __builtin_rotateleft64(wasm_i64x2_extract_lane(res_1, 0), wasm_i32x4_extract_lane(cm, 2));
 		out[3] = __builtin_rotateleft64(wasm_i64x2_extract_lane(res_1, 1), wasm_i32x4_extract_lane(cm, 3));
+	}
+}
+
+static void decodeFilterExpSimd(unsigned int* data, size_t count)
+{
+	for (size_t i = 0; i < count; i += 4)
+	{
+		v128_t v = wasm_v128_load(&data[i]);
+
+		// decode exponent into 2^x directly
+		v128_t ef = wasm_i32x4_shr(v, 24);
+		v128_t es = wasm_i32x4_shl(wasm_i32x4_add(ef, wasm_i32x4_splat(127)), 23);
+
+		// decode 24-bit mantissa into floating-point value
+		v128_t mf = wasm_i32x4_shr(wasm_i32x4_shl(v, 8), 8);
+		v128_t m = wasm_f32x4_convert_i32x4(mf);
+
+		v128_t r = wasm_f32x4_mul(es, m);
+
+		wasm_v128_store(&data[i], r);
 	}
 }
 #endif
@@ -304,6 +356,20 @@ void meshopt_decodeFilterQuat(void* buffer, size_t vertex_count, size_t vertex_s
 	decodeFilterQuatSimd(static_cast<short*>(buffer), vertex_count);
 #else
 	decodeFilterQuat(static_cast<short*>(buffer), vertex_count);
+#endif
+}
+
+void meshopt_decodeFilterExp(void* buffer, size_t vertex_count, size_t vertex_size)
+{
+	using namespace meshopt;
+
+	assert(vertex_count % 4 == 0);
+	assert(vertex_size % 4 == 0);
+
+#if defined(SIMD_WASM)
+	decodeFilterExpSimd(static_cast<unsigned int*>(buffer), vertex_count * (vertex_size / 4));
+#else
+	decodeFilterExp(static_cast<unsigned int*>(buffer), vertex_count * (vertex_size / 4));
 #endif
 }
 
