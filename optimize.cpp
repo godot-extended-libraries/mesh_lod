@@ -152,7 +152,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 
 				float threshold = powf(0.7f, float(count_i));
 				size_t target_index_count = (unsigned_indices.size() * threshold) / 3 * 3;
-				float target_error = 1e-2f;
+				float target_error = 1e-3f;
 
 				if (unsigned_indices.size() < target_index_count) {
 					target_index_count = unsigned_indices.size();
