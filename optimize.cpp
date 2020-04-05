@@ -240,22 +240,12 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				// meshopt_optimizeVertexCache(lod.ptrw(), lod.ptr(), total_indices, total_vertices);
 				// meshopt_optimizeOverdraw(lod.ptrw(), lod.ptr(), total_indices, &meshopt_vertices[0].px, total_vertices, sizeof(Vertex), 1.0f);
 
-				// Array current_mesh = mesh_array;
-				// Vector<int32_t> indexes;
-				// const int32_t current_lod = lods.size() - 1;
-				// Vector<uint32_t> &lod = lods.write[current_lod];
-				// indexes.resize(lods[current_lod].size());
-				// for (int32_t p = 0; p < lods[current_lod].size(); p++) {
-				// 	indexes.write[p] = lods[current_lod][p];
-				// }
-
-				// current_mesh[Mesh::ARRAY_INDEX] = indexes;
-
 				Vector<int32_t> indexes;
-				Vector<uint32_t> &lod = lods.write[0];
-				indexes.resize(lods[0].size());
-				for (int32_t p = 0; p < lods[0].size(); p++) {
-					indexes.write[p] = lods[0][p];
+				const int32_t current_lod = 0;
+				Vector<uint32_t> &lod = lods.write[current_lod];
+				indexes.resize(lods[current_lod].size());
+				for (int32_t p = 0; p < lods[current_lod].size(); p++) {
+					indexes.write[p] = lods[current_lod][p];
 				}
 				Array current_mesh = mesh_array;
 				current_mesh[Mesh::ARRAY_INDEX] = indexes;
