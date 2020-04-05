@@ -168,8 +168,8 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				{
 					Vector<uint32_t> remap;
 					remap.resize(total_vertices);
-					size_t unique_vertices = meshopt_generateVertexRemap(remap.ptrw(), lod.ptr(), total_indices, &meshopt_vertices[0].px, total_vertices, sizeof(Vertex));
-					meshopt_remapIndexBuffer(lod.ptrw(), lod.ptr(), lod.size(), &remap[0]);
+					meshopt_optimizeVertexFetchRemap(remap.ptrw(), lod.ptr(), total_indices, total_vertices);
+					meshopt_remapIndexBuffer(lod.ptrw(), lod.ptr(), lod.size(), remap.ptr());
 					for (size_t blend_i = 0; blend_i < blend_shape_array.size(); blend_i++) {
 						Array morph = blend_shape_array[blend_i];
 						morph.resize(Mesh::ARRAY_MAX);
