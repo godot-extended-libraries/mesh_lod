@@ -97,6 +97,17 @@ void MeshOptimize::simplify(Node *p_root_node) {
 	for (int32_t i = 0; i < meshes.size(); i++) {
 		Vector<Ref<Mesh> > lod_meshes;
 		Ref<Mesh> mesh = meshes[i].mesh;
+		if (mesh->get_blend_shape_count()) {
+			// Don't lod blend shapes.
+			MeshInstance *mi = memnew(MeshInstance);
+			mi->set_mesh(mesh);
+			mi->set_skeleton_path(meshes[i].skeleton_path);
+			mi->set_name(meshes[i].name);
+			mi->set_skin(meshes[i].skin);
+			meshes[i].original_node->replace_by(mi, true);
+			mi->set_owner(p_root_node);
+			continue;
+		}
 		for (int32_t count_i = 0; count_i < lod_count; count_i++) {
 			Ref<ArrayMesh> result_mesh;
 			result_mesh.instance();
