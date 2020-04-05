@@ -164,53 +164,9 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				meshopt_optimizeVertexCache(&lod.write[0], &lod.write[0], lod.size(), meshopt_vertices.size());
 				meshopt_optimizeOverdraw(&lod.write[0], &lod[0], lod.size(), &meshopt_vertices[0].px, meshopt_vertices.size(), sizeof(Vertex), 1.0f);
 
-				Vector<uint32_t> remap;
-				remap.resize(meshopt_vertices.size());
-				meshopt_generateVertexRemap(&remap.write[0], &lod.write[0], lod.size(), &meshopt_vertices[0].px, meshopt_vertices.size(), sizeof(Vertex));
 				Array blend_shape_array = VisualServer::get_singleton()->mesh_surface_get_blend_shape_arrays(mesh->get_rid(), j);
 				for (size_t blend_i = 0; blend_i < blend_shape_array.size(); blend_i++) {
 					Array morph = blend_shape_array[blend_i];
-					morph.resize(Mesh::ARRAY_MAX);
-					Array normals = morph[ArrayMesh::ARRAY_NORMAL];
-					Array vertexes = morph[ArrayMesh::ARRAY_VERTEX];
-					Vector<Vertex> morph_vertices;
-					morph_vertices.resize(vertexes.size());
-					for (int32_t k = 0; k < vertexes.size(); k++) {
-						Vertex morph_vertex;
-						Vector3 vertex = vertexes[k];
-						morph_vertex.px = vertex.x;
-						morph_vertex.py = vertex.y;
-						morph_vertex.pz = vertex.z;
-						if (normals.size()) {
-							Vector3 normal = normals[k];
-							morph_vertex.nx = normal.x;
-							morph_vertex.ny = normal.y;
-							morph_vertex.nz = normal.z;
-						}
-						morph_vertices.write[k] = morph_vertex;
-					}
-					meshopt_remapVertexBuffer(&morph_vertices.write[0], &morph_vertices.write[0], morph_vertices.size(), sizeof(Vertex), &remap[0]);
-					PoolVector3Array vertex_array;
-					vertex_array.resize(morph_vertices.size());
-					PoolVector3Array normal_array;
-					normal_array.resize(morph_vertices.size());
-					PoolVector3Array::Write vw = vertex_array.write();
-					PoolVector3Array::Write nw = normal_array.write();
-					for (int32_t k = 0; k < morph_vertices.size(); k++) {
-						Vertex morph_vertex = morph_vertices[k];
-						Vector3 vertex;
-						vertex.x = morph_vertex.px;
-						vertex.y = morph_vertex.py;
-						vertex.z = morph_vertex.pz;
-						vw[k] = vertex;
-						Vector3 normal;
-						normal.x = morph_vertex.nx;
-						normal.y = morph_vertex.ny;
-						normal.z = morph_vertex.nz;
-						nw[k] = normal;
-					}
-					morph[ArrayMesh::ARRAY_VERTEX] = vertex_array;
-					morph[ArrayMesh::ARRAY_NORMAL] = normal_array;
 					morph[ArrayMesh::ARRAY_INDEX] = Variant();
 					blend_shape_array[blend_i] = morph;
 				}
@@ -226,6 +182,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				Array current_mesh = mesh_array;
 				Vector<int32_t> indexes = current_mesh[Mesh::ARRAY_INDEX];
 				indexes.resize(lods[current_lod].size());
+
 				for (int32_t p = 0; p < lods[current_lod].size(); p++) {
 					indexes.write[p] = lods[current_lod][p];
 				}
