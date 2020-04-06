@@ -174,66 +174,9 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				meshopt_optimizeOverdraw(lod.ptrw(), lod.ptr(), total_indices, &meshopt_vertices[0].px, total_vertices, sizeof(Vertex), 1.0f);
 				Array blend_shape_array = VisualServer::get_singleton()->mesh_surface_get_blend_shape_arrays(mesh->get_rid(), j);
 				{
-					Vector<uint32_t> remap;
-					remap.resize(total_vertices);
-					meshopt_generateVertexRemap(remap.ptrw(), lod.ptr(), total_indices, &meshopt_vertices[0].px, total_vertices, sizeof(Vertex));
 					for (size_t blend_i = 0; blend_i < blend_shape_array.size(); blend_i++) {
 						Array morph = blend_shape_array[blend_i];
-						Vector<Vertex> morph_source;
-						Array morph_vertices = morph[ArrayMesh::ARRAY_VERTEX];
-						Array morph_normals = morph[ArrayMesh::ARRAY_NORMAL];
-						Array morph_tangents = mesh_array[Mesh::ARRAY_TANGENT];
-						morph_source.resize(vertexes.size());
-						for (int32_t k = 0; k < morph_vertices.size(); k++) {
-							Vertex morph_vertex;
-							Vector3 vertex = morph_vertices[k];
-							morph_vertex.px = vertex.x;
-							morph_vertex.py = vertex.y;
-							morph_vertex.pz = vertex.z;
-							if (morph_normals.size()) {
-								Vector3 normal = morph_normals[k];
-								morph_vertex.nx = normal.x;
-								morph_vertex.ny = normal.y;
-								morph_vertex.nz = normal.z;
-							}
-							if (morph_tangents.size()) {
-								morph_vertex.tx = morph_tangents[k * 4 + 0];
-								morph_vertex.ty = morph_tangents[k * 4 + 1];
-								morph_vertex.tz = morph_tangents[k * 4 + 2];
-								morph_vertex.tw = morph_tangents[k * 4 + 3];
-							}
-							morph_source.write[k] = morph_vertex;
-						}
-						meshopt_remapVertexBuffer(&morph_source.write[0].px, &morph_source[0].px, total_vertices, sizeof(Vertex), remap.ptr());
-						PoolVector3Array vertex_array;
-						vertex_array.resize(morph_source.size());
-						PoolVector3Array normal_array;
-						normal_array.resize(morph_source.size());
-						PoolRealArray tangent_array;
-						tangent_array.resize(morph_source.size() * 4);
-						PoolVector3Array::Write vw = vertex_array.write();
-						PoolVector3Array::Write nw = normal_array.write();
-						PoolRealArray::Write tw = tangent_array.write();
-						for (int32_t k = 0; k < morph_source.size(); k++) {
-							Vertex morph_vertex = morph_source[k];
-							Vector3 vertex;
-							vertex.x = morph_vertex.px;
-							vertex.y = morph_vertex.py;
-							vertex.z = morph_vertex.pz;
-							vw[k] = vertex;
-							Vector3 normal;
-							normal.x = morph_vertex.nx;
-							normal.y = morph_vertex.ny;
-							normal.z = morph_vertex.nz;
-							nw[k] = normal;
-							tw[k * 4 + 0] = morph_vertex.tx;
-							tw[k * 4 + 1] = morph_vertex.ty;
-							tw[k * 4 + 2] = morph_vertex.tz;
-							tw[k * 4 + 3] = morph_vertex.tw;
-						}
-						morph[ArrayMesh::ARRAY_VERTEX] = vertex_array;
-						morph[ArrayMesh::ARRAY_NORMAL] = normal_array;
-						morph[ArrayMesh::ARRAY_TANGENT] = tangent_array;
+						//Doesn't do anything
 						morph[ArrayMesh::ARRAY_INDEX] = Variant();
 						blend_shape_array[blend_i] = morph;
 					}
