@@ -97,17 +97,6 @@ void MeshOptimize::simplify(Node *p_root_node) {
 	for (int32_t i = 0; i < meshes.size(); i++) {
 		Vector<Ref<Mesh> > lod_meshes;
 		Ref<Mesh> mesh = meshes[i].mesh;
-		if (mesh->get_blend_shape_count()) {
-			// Don't lod blend shapes.
-			MeshInstance *mi = memnew(MeshInstance);
-			mi->set_mesh(mesh);
-			mi->set_skeleton_path(meshes[i].skeleton_path);
-			mi->set_name(meshes[i].name);
-			mi->set_skin(meshes[i].skin);
-			meshes[i].original_node->replace_by(mi, true);
-			mi->set_owner(p_root_node);
-			continue;
-		}
 		for (int32_t count_i = 0; count_i < lod_count; count_i++) {
 			Ref<ArrayMesh> result_mesh;
 			result_mesh.instance();
@@ -180,37 +169,36 @@ void MeshOptimize::simplify(Node *p_root_node) {
 					Vector<uint32_t> remap;
 					remap.resize(total_vertices);
 					size_t unique_vertices = meshopt_generateVertexRemap(remap.ptrw(), lod.ptr(), total_indices, &meshopt_vertices[0].px, total_vertices, sizeof(Vertex));
-					meshopt_remapIndexBuffer(lod.ptrw(), lod.ptr(), lod.size(), &remap[0]);
+					// meshopt_remapIndexBuffer(lod.ptrw(), lod.ptr(), lod.size(), &remap[0]);
 					for (size_t blend_i = 0; blend_i < blend_shape_array.size(); blend_i++) {
 						Array morph = blend_shape_array[blend_i];
-						morph.resize(Mesh::ARRAY_MAX);
-						Array normals = morph[ArrayMesh::ARRAY_NORMAL];
-						Array vertexes = morph[ArrayMesh::ARRAY_VERTEX];
-						Vector<Vertex> morph_vertices;
-						morph_vertices.resize(vertexes.size());
-						for (int32_t k = 0; k < vertexes.size(); k++) {
+						Vector<Vertex> morph_source;
+						Array morph_vertices = morph[ArrayMesh::ARRAY_VERTEX];
+						Array morph_normals = morph[ArrayMesh::ARRAY_NORMAL];
+						morph_source.resize(vertexes.size());
+						for (int32_t k = 0; k < morph_vertices.size(); k++) {
 							Vertex morph_vertex;
-							Vector3 vertex = vertexes[k];
+							Vector3 vertex = morph_vertices[k];
 							morph_vertex.px = vertex.x;
 							morph_vertex.py = vertex.y;
 							morph_vertex.pz = vertex.z;
 							if (normals.size()) {
-								Vector3 normal = normals[k];
+								Vector3 normal = morph_normals[k];
 								morph_vertex.nx = normal.x;
 								morph_vertex.ny = normal.y;
 								morph_vertex.nz = normal.z;
 							}
-							morph_vertices.write[k] = morph_vertex;
+							morph_source.write[k] = morph_vertex;
 						}
-						meshopt_remapVertexBuffer(&morph_vertices.write[0].px, &morph_vertices[0].px, total_vertices, sizeof(Vertex), remap.ptr());
+						meshopt_remapVertexBuffer(&morph_source.write[0].px, &morph_source[0].px, total_vertices, sizeof(Vertex), remap.ptr());
 						PoolVector3Array vertex_array;
-						vertex_array.resize(morph_vertices.size());
+						vertex_array.resize(morph_source.size());
 						PoolVector3Array normal_array;
-						normal_array.resize(morph_vertices.size());
+						normal_array.resize(morph_source.size());
 						PoolVector3Array::Write vw = vertex_array.write();
 						PoolVector3Array::Write nw = normal_array.write();
-						for (int32_t k = 0; k < morph_vertices.size(); k++) {
-							Vertex morph_vertex = morph_vertices[k];
+						for (int32_t k = 0; k < morph_source.size(); k++) {
+							Vertex morph_vertex = morph_source[k];
 							Vector3 vertex;
 							vertex.x = morph_vertex.px;
 							vertex.y = morph_vertex.py;
@@ -222,8 +210,6 @@ void MeshOptimize::simplify(Node *p_root_node) {
 							normal.z = morph_vertex.nz;
 							nw[k] = normal;
 						}
-						morph[ArrayMesh::ARRAY_VERTEX] = vertex_array;
-						morph[ArrayMesh::ARRAY_NORMAL] = normal_array;
 						morph[ArrayMesh::ARRAY_INDEX] = Variant();
 						blend_shape_array[blend_i] = morph;
 					}
