@@ -95,6 +95,9 @@ void MeshOptimize::simplify(Node *p_root_node) {
 		float tx, ty, tz, tw;
 	};
 
+	EditorProgress progress_mesh_simplification("gen_mesh_simplifications", TTR("Generating Mesh Simplification"), meshes.size() * lod_count);
+	int step = 0;
+
 	for (int32_t i = 0; i < meshes.size(); i++) {
 		Vector<Ref<Mesh> > lod_meshes;
 		Ref<Mesh> mesh = meshes[i].mesh;
@@ -226,6 +229,8 @@ void MeshOptimize::simplify(Node *p_root_node) {
 					mi->set_owner(spatial->get_owner());
 				}
 			}
+			progress_mesh_simplification.step(TTR("Generating for Mesh: ") + meshes[i].original_node->get_name() + " (" + itos(step) + "/" + itos(meshes.size()) + ")", step);
+			step++;
 		}
 		Spatial *spatial = memnew(Spatial);
 		Spatial *mesh_instance = Object::cast_to<Spatial>(meshes[i].original_node);
@@ -234,6 +239,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 			spatial->set_name(mesh_instance->get_name());
 		}
 		meshes[i].original_node->replace_by(spatial);
+		
 	}
 }
 
@@ -268,6 +274,12 @@ void MeshOptimizePlugin::optimize(Variant p_user_data) {
 	}
 	file_export_lib->popup_centered_ratio();
 	file_export_lib->set_title(TTR("Optimize Scene"));
+	Node *root = editor->get_tree()->get_edited_scene_root();
+	String filename = String(root->get_filename().get_file().get_basename());
+	if (filename.empty()) {
+		filename = root->get_name();
+	}
+	file_export_lib->set_current_file(filename + String(".scn"));
 }
 
 void MeshOptimizePlugin::_dialog_action(String p_file) {
