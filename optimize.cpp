@@ -101,7 +101,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 	for (int32_t i = 0; i < meshes.size(); i++) {
 		Vector<Ref<Mesh> > lod_meshes;
 		Ref<Mesh> mesh = meshes[i].mesh;
-		for (int32_t count_i = 0; count_i < lod_count; count_i++) {
+		for (size_t count_i = 0; count_i < lod_count; count_i++) {
 			Ref<ArrayMesh> result_mesh;
 			result_mesh.instance();
 			for (int32_t blend_i = 0; blend_i < mesh->get_blend_shape_count(); blend_i++) {
@@ -162,7 +162,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				Vector<uint32_t> &lod = lods.write[current_lod];
 
 				float threshold = powf(0.7f, float(count_i));
-				size_t target_index_count = (unsigned_indices.size() * threshold) / 3 * 3;
+				int32_t target_index_count = (unsigned_indices.size() * threshold) / 3 * 3;
 				float target_error = 1e-3f;
 
 				if (unsigned_indices.size() < target_index_count) {
@@ -177,7 +177,7 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				meshopt_optimizeOverdraw(lod.ptrw(), lod.ptr(), total_indices, &meshopt_vertices[0].px, total_vertices, sizeof(Vertex), 1.0f);
 				Array blend_shape_array = VisualServer::get_singleton()->mesh_surface_get_blend_shape_arrays(mesh->get_rid(), j);
 				{
-					for (size_t blend_i = 0; blend_i < blend_shape_array.size(); blend_i++) {
+					for (int32_t blend_i = 0; blend_i < blend_shape_array.size(); blend_i++) {
 						Array morph = blend_shape_array[blend_i];
 						//Doesn't do anything
 						morph[ArrayMesh::ARRAY_INDEX] = Variant();
