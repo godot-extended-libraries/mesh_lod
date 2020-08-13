@@ -219,15 +219,16 @@ void MeshOptimize::simplify(Node *p_root_node) {
 				Spatial *spatial = Object::cast_to<Spatial>(meshes[i].original_node);
 				if (spatial) {
 					mi->set_transform(spatial->get_transform());
-				}
-				if (spatial->get_parent()) {
-					spatial->get_parent()->add_child(mi);
-				} else {
-					spatial->add_child(mi);
-				}
-				if (spatial->get_owner() != spatial) {
-					mi->set_owner(spatial->get_owner());
-				}
+                    
+                    if (spatial->get_parent()) {
+                        spatial->get_parent()->add_child(mi);
+                    } else {
+                        spatial->add_child(mi);
+                    }
+                    if (spatial->get_owner() != spatial) {
+                        mi->set_owner(spatial->get_owner());
+                    }
+                }
 			}
 			progress_mesh_simplification.step(TTR("Generating for Mesh: ") + meshes[i].original_node->get_name() + " (" + itos(step) + "/" + itos(meshes.size()) + ")", step);
 			step++;
